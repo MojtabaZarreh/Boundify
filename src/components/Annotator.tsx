@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
@@ -8,8 +9,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Separator } from "@/components/ui/separator";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import {
   ChevronLeft,
   ChevronRight,
@@ -48,6 +48,7 @@ export function Annotator() {
   const [newClassName, setNewClassName] = useState("");
   const [mode, setMode] = useState<"edit" | "lock">("edit");
   const [modelUrl, setModelUrl] = useState("");
+  const [apiKey, setApiKey] = useState("");
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -113,7 +114,12 @@ export function Annotator() {
         const formData = new FormData();
         formData.append('file', currentImage.file);
 
-        const response = await fetch(modelUrl, {
+        let url = modelUrl;
+        if (apiKey) {
+            url += `${modelUrl.includes('?') ? '&' : '?'}api_key=${apiKey}`;
+        }
+
+        const response = await fetch(url, {
             method: 'POST',
             body: formData,
         });
@@ -134,16 +140,16 @@ export function Annotator() {
 
         if (predictions.length === 0) {
             toast({ title: "No objects detected by the model." });
-            setAnnotations(prev => ({ ...prev, [currentImage.file.name]: [] })); // Mark as processed, empty
+            setAnnotations(prev => ({ ...prev, [currentImage.file.name]: [] }));
             setIsLoading(false);
             return;
         }
 
         let newClassesCreated = false;
         let tempClasses = [...classes];
-        let nextId = (tempClasses.length > 0 ? Math.max(...tempClasses.map(c => c.id)) : 0) + 1;
         
         const newBoxes: BoundingBox[] = predictions.map((pred: any) => {
+            let nextId = (tempClasses.length > 0 ? Math.max(...tempClasses.map(c => c.id)) : 0) + 1;
             let cls = tempClasses.find(c => c.name === pred.class);
             if (!cls) {
                 cls = {
@@ -152,12 +158,11 @@ export function Annotator() {
                     color: CLASS_COLORS[nextId % CLASS_COLORS.length],
                 };
                 tempClasses.push(cls);
-                nextId++;
                 newClassesCreated = true;
             }
 
             return {
-                id: `${pred.detection_id}-${Math.random()}`,
+                id: `${pred.detection_id || 'pred'}-${Math.random().toString(36).substr(2, 9)}`,
                 classId: cls.id,
                 x: pred.x - pred.width / 2,
                 y: pred.y - pred.height / 2,
@@ -179,13 +184,13 @@ export function Annotator() {
     } finally {
         setIsLoading(false);
     }
-  }, [modelUrl, images, annotations, toast, classes]);
+  }, [modelUrl, apiKey, images, annotations, toast, classes]);
 
   useEffect(() => {
     if (mode === 'lock' && images.length > 0 && images[currentIndex]) {
       fetchAnnotations(currentIndex);
     }
-  }, [currentIndex, mode, fetchAnnotations, images]);
+  }, [currentIndex, mode, images, fetchAnnotations]);
 
 
   const handleModeChange = (checked: boolean) => {
@@ -341,16 +346,11 @@ export function Annotator() {
 
     const currentInteraction = getInteractionForPos(pos);
     
-    if (mode === 'lock' && currentInteraction) {
-      setInteraction({ ...currentInteraction, startPos: pos, originalBox: annotations[images[currentIndex].file.name].find(b => b.id === (currentInteraction as any).boxId) });
-      return;
-    }
-
     if (currentInteraction) {
         setInteraction({ ...currentInteraction, startPos: pos, originalBox: annotations[images[currentIndex].file.name].find(b => b.id === (currentInteraction as any).boxId) });
     } else if(mode === 'edit' && activeClassId) {
         setInteraction({ type: 'drawing', startPos: pos, x: pos.x, y: pos.y, width: 0, height: 0 });
-    } else if (!currentInteraction) {
+    } else {
         setIsDragging(true);
         setDragStart({ x: e.clientX, y: e.clientY });
     }
@@ -521,7 +521,7 @@ export function Annotator() {
     });
   };
 
-  const resetZoom = () => {
+  const resetZoom = useCallback(() => {
     if (!imageRef.current || !containerRef.current) return;
     const containerWidth = containerRef.current.offsetWidth;
     const containerHeight = containerRef.current.offsetHeight;
@@ -535,11 +535,11 @@ export function Annotator() {
     const offsetX = (containerWidth - imageWidth * scale) / 2;
     const offsetY = (containerHeight - imageHeight * scale) / 2;
     setTransform({ scale, offsetX, offsetY });
-  }
+  }, []);
 
   return (
     <TooltipProvider>
-      <div className="h-screen w-screen bg-background text-foreground grid grid-cols-1 md:grid-cols-[1fr_380px] overflow-hidden">
+      <div className="h-svh w-screen bg-background text-foreground grid grid-cols-1 md:grid-cols-[1fr_380px]">
         {/* Main Canvas Area */}
         <main ref={containerRef} className="relative h-full w-full bg-muted/30 flex items-center justify-center overflow-hidden" onWheel={handleWheel}>
           <canvas
@@ -576,7 +576,7 @@ export function Annotator() {
         <aside className="h-full flex flex-col border-l bg-background/80 backdrop-blur-xl">
           <div className="p-4 border-b flex items-center gap-3">
             <LogoIcon className="w-8 h-8 text-primary" />
-            <h1 className="text-xl font-bold">Boundify Annotator</h1>
+            <h1 className="text-xl font-bold">Glass Annotator</h1>
           </div>
           
           <ScrollArea className="flex-1">
@@ -586,13 +586,13 @@ export function Annotator() {
                 <CardHeader>
                   <CardTitle>Images</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent>
                   <input type="file" ref={fileInputRef} onChange={handleFileSelect} multiple accept="image/*" className="hidden" />
                   <Button onClick={() => fileInputRef.current?.click()} className="w-full">
                     <UploadCloud className="mr-2" /> Upload Images
                   </Button>
                   {images.length > 0 && (
-                    <div className="flex items-center justify-between">
+                    <div className="mt-4 flex items-center justify-between">
                       <Button variant="outline" size="icon" onClick={() => setCurrentIndex(p => Math.max(0, p - 1))} disabled={currentIndex === 0}><ChevronLeft /></Button>
                       <p className="text-sm font-medium">
                         {currentIndex + 1} / {images.length}
@@ -608,7 +608,7 @@ export function Annotator() {
                 <CardHeader>
                   <CardTitle>Classes</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent>
                   <div className="flex gap-2">
                     <Input 
                       placeholder="New class name" 
@@ -618,7 +618,7 @@ export function Annotator() {
                     />
                     <Button onClick={handleAddNewClass}><Plus/></Button>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="mt-4 flex flex-wrap gap-2">
                     {classes.map(cls => (
                       <Button 
                         key={cls.id} 
@@ -639,9 +639,9 @@ export function Annotator() {
                 <CardHeader>
                   <CardTitle>Annotations</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <ScrollArea className="h-40">
-                    <div className="space-y-2">
+                <CardContent className="h-40">
+                  <ScrollArea className="h-full">
+                    <div className="space-y-2 pr-3">
                       {(annotations[images[currentIndex]?.file.name] || []).map(box => {
                         const cls = classes.find(c => c.id === box.classId);
                         return (
@@ -679,12 +679,22 @@ export function Annotator() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="model-url">Model API URL (e.g. http://host/predict/2)</Label>
+                    <Label htmlFor="model-url">Model API URL</Label>
                     <Input 
                       id="model-url" 
-                      placeholder="https://api.example.com/predict/model_id" 
+                      placeholder="https://detect.roboflow.com/your-model/1" 
                       value={modelUrl}
                       onChange={e => setModelUrl(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="api-key">API Key</Label>
+                    <Input 
+                      id="api-key" 
+                      placeholder="Your Roboflow API Key" 
+                      value={apiKey}
+                      onChange={e => setApiKey(e.target.value)}
+                      type="password"
                     />
                   </div>
                 </CardContent>
