@@ -576,7 +576,7 @@ export function Annotator() {
         <aside className="h-full flex flex-col border-l bg-background/80 backdrop-blur-xl">
           <div className="p-4 border-b flex items-center gap-3">
             <LogoIcon className="w-8 h-8 text-primary" />
-            <h1 className="text-xl font-bold">Glass Annotator</h1>
+            <h1 className="text-xl font-bold">Boundify Annotator</h1>
           </div>
           
           <ScrollArea className="flex-1">
