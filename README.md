@@ -6,7 +6,7 @@ While it was originally created for detecting **7-segment industrial LED display
 Boundify combines **YOLOv8 model-assisted auto-annotation**, **manual correction**, and optional **Roboflow API integration** to dramatically speed up dataset creation and continuously improve model performance.
 
 
-https://github.com/MojtabaZarreh/Boundify/blob/main/demo/demo.gif
+![Demo](https://github.com/MojtabaZarreh/Boundify/blob/main/demo/demo.gif)
 
 
 ---
@@ -63,4 +63,5 @@ Easily build and run anywhere:
 ```bash
 docker build -f docker/dockerfile -t boundify .
 docker run -p 9000:9000 boundify
+
 
