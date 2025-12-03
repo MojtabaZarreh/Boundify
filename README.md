@@ -62,7 +62,4 @@ Easily build and run anywhere:
 
 ```bash
 docker build -f docker/dockerfile -t boundify .
-docker run -p 80:80 boundify
-
-
-
+docker run -p 80:80 boundify```
